@@ -1,87 +1,67 @@
-extern crate reqwest;
-extern crate anyhow;
-extern crate serde_json;
-use std::env;
-use std::fs;
-use anyhow::{Result, anyhow};
-use serde_json::json;
+use anyhow::{Result};
+use crate::raw_client::RawGameSenseClient;
+use serde_json;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 pub struct GameSenseClient {
-    client: reqwest::blocking::Client,
-    address: String,
+    raw_client: Arc<Mutex<RawGameSenseClient>>,
+    game: String,
+    heartbeat_handle: Option<thread::JoinHandle<Result<()>>>
 }
 
 impl GameSenseClient {
-    pub fn new() -> Result<GameSenseClient> {
-        let path = match env::consts::OS {
-            "macos" => Ok(String::from("/Library/Application Support/SteelSeries Engine 3/coreProps.json")),
-            "windows" => Ok(env::var("PROGRAMDATA")? + "/SteelSeries/SteelSeries Engine 3/coreProps.json"),
-            _ => Err(anyhow!("Platform must be either MacOS or Windows. Got {}", env::consts::OS))
-        };
-
-        let config: serde_json::Value = serde_json::from_str(&fs::read_to_string(path?)?)?;
-
-        return Ok(GameSenseClient {
-            client: reqwest::blocking::Client::new(),
-            address: config["address"].as_str().expect("`address` not found").to_owned()
-        });
-    }
-
-    fn send_data(&self, endpoint: &str, data: &serde_json::Value) -> Result<String> {
+    pub fn new(game: String) -> Result<GameSenseClient> {
         Ok(
-            self.client.post(format!("http://{}/{}", self.address, endpoint))
-                .json(data)
-                .send()?
-                .text()?
+            GameSenseClient {
+                raw_client: Arc::new(Mutex::new(RawGameSenseClient::new()?)),
+                game: game,
+                heartbeat_handle: None
+            }
         )
     }
 
-    pub fn game_event(&self, game: &str, event: &str, value: isize) -> Result<String> {
-        self.game_event_frame(game, event, value, None)
+    pub fn start_heartbeat(&mut self) {
+        let raw_client = Arc::clone(&self.raw_client);
+
+        let game = self.game.clone();
+
+        self.heartbeat_handle = Some(
+            thread::spawn(move || {
+                loop {
+                    raw_client.lock().unwrap().heartbeat(&game)?;
+                    thread::sleep(Duration::from_secs(10))
+                }
+            })
+        );
     }
 
-    pub fn game_event_frame(&self, game: &str, event: &str, value: isize, frame: Option<serde_json::Value>) -> Result<String> {
-        let mut data = json!({
-            "game": game,
-            "event": event,
-            "value": value
-        });
-
-        if let Some(frame_value) = frame {
-            data.as_object_mut().unwrap().insert(String::from("frame"), frame_value);
-        }
-
-        self.send_data("game_event", &data)
+    pub fn stop_heartbeat(&mut self) -> Result<()> {
+        self.heartbeat_handle
+            .take().expect("Trying to stop uninitialized heartbeat thread")
+            .join().expect("Could not join heartbeat thread")
     }
 
-    pub fn heartbeat(&self, game: &str) -> Result<String> {
-        let data = json!({
-            "game": game
-        });
-
-        self.send_data("game_heartbeat", &data)
+    pub fn register_event(&self, event: &str) -> Result<String> {
+        self.raw_client.lock().unwrap().register_event(&self.game, event, None, None, None, None)
     }
 
-    pub fn register_game(&self, game: &str, game_display_name: &str, developer: &str) -> Result<String> {
-        let data = json!({
-            "game": game,
-            "game_display_name": game_display_name,
-            "developer": developer
-        });
-
-        self.send_data("game_metadata", &data)
+    pub fn register_event_full(&self, event: &str, min_value: Option<isize>, max_value: Option<isize>, icon_id: Option<u8>, value_optional: Option<bool>) -> Result<String> {
+        self.raw_client.lock().unwrap().register_event(&self.game, event, min_value, max_value, icon_id, value_optional)
     }
 
-    pub fn register_event(&self, game: &str, event: &str, min_value: isize, max_value: isize, icon_id: u8, value_optional: bool) -> Result<String> {
-        let data = json!({
-            "game": game,
-            "event": event,
-            "min_value": min_value,
-            "max_value": max_value,
-            "icon_id": icon_id,
-            "value_optional": value_optional
-        });
+    pub fn trigger_event(&self, event: &str, value: isize) -> Result<String> {
+        self.raw_client.lock().unwrap().game_event(&self.game, event, value, None)
+    }
 
-        self.send_data("register_game_event", &data)
+    pub fn trigger_event_frame(&self, event: &str, value: isize, frame: serde_json::Value) -> Result<String> {
+        self.raw_client.lock().unwrap().game_event(&self.game, event, value, Some(frame))
+    }
+}
+
+impl Drop for GameSenseClient {
+    fn drop(&mut self) {
+        self.stop_heartbeat().ok();
     }
 }
