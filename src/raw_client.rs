@@ -1,12 +1,12 @@
 use std::env;
 use std::fs;
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use reqwest;
 use serde_json;
 use serde_json::json;
 
 macro_rules! cond_argument {
-    ($data:ident, $key:literal, $option_value:ident) => {
+    ($data:expr, $key:literal, $option_value:ident) => {
         if let Some(value) = $option_value {
             $data.as_object_mut().unwrap().insert(String::from($key), json!(value));
         }
@@ -35,22 +35,32 @@ impl RawGameSenseClient {
     }
 
     pub fn send_data(&self, endpoint: &str, data: &serde_json::Value) -> Result<String> {
-        Ok(
-            self.client.post(format!("http://{}/{}", self.address, endpoint))
-                .json(data)
-                .send()?
-                .text()?
-        )
+        let data = self.client.post(format!("http://{}/{}", self.address, endpoint))
+            .json(data)
+            .send()?
+            .text()?;
+
+        let data: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&data)?;
+
+        let (key, value) = data.iter().next().unwrap();
+        let value = value.as_str().unwrap_or(&value.to_string()).to_owned();
+
+        match key.as_str() {
+            "error" => bail!(value),
+            _ => Ok(value)
+        }
     }
 
     pub fn game_event(&self, game: &str, event: &str, value: isize, frame: Option<serde_json::Value>) -> Result<String> {
         let mut data = json!({
             "game": game,
             "event": event,
-            "value": value
+            "data": {
+                "value": value
+            }
         });
 
-        cond_argument!(data, "frame", frame);
+        cond_argument!(data.get_mut("data").unwrap(), "frame", frame);
 
         self.send_data("game_event", &data)
     }
@@ -78,11 +88,7 @@ impl RawGameSenseClient {
     pub fn register_event(&self, game: &str, event: &str, min_value: Option<isize>, max_value: Option<isize>, icon_id: Option<u8>, value_optional: Option<bool>) -> Result<String> {
         let mut data = json!({
             "game": game,
-            "event": event,
-            "min_value": min_value,
-            "max_value": max_value,
-            "icon_id": icon_id,
-            "value_optional": value_optional
+            "event": event
         });
 
         cond_argument!(data, "min_value", min_value);

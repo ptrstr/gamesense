@@ -1,23 +1,35 @@
-use anyhow::{Result};
+use anyhow::{Context, Result};
 use crate::raw_client::RawGameSenseClient;
+use crate::timer::Timer;
 use serde_json;
 use std::sync::{Arc, Mutex};
-use std::thread;
 use std::time::Duration;
 
 pub struct GameSenseClient {
     raw_client: Arc<Mutex<RawGameSenseClient>>,
     game: String,
-    heartbeat_handle: Option<thread::JoinHandle<Result<()>>>
+    heartbeat: Option<Timer>
 }
 
 impl GameSenseClient {
-    pub fn new(game: String) -> Result<GameSenseClient> {
+    pub fn new(game: &str, game_display_name: &str, developer: &str, deinitialize_timer_length_ms: Option<u16>) -> Result<GameSenseClient> {
+        let client = GameSenseClient {
+            raw_client: Arc::new(Mutex::new(RawGameSenseClient::new()?)),
+            game: game.to_owned(),
+            heartbeat: None
+        };
+
+        client.raw_client.lock().unwrap().register_game(&client.game, Some(game_display_name), Some(developer), deinitialize_timer_length_ms)?;
+
+        Ok(client)
+    }
+
+    pub fn from_game_name(game: &str) -> Result<GameSenseClient> {
         Ok(
             GameSenseClient {
                 raw_client: Arc::new(Mutex::new(RawGameSenseClient::new()?)),
-                game: game,
-                heartbeat_handle: None
+                game: game.to_owned(),
+                heartbeat: None
             }
         )
     }
@@ -27,20 +39,19 @@ impl GameSenseClient {
 
         let game = self.game.clone();
 
-        self.heartbeat_handle = Some(
-            thread::spawn(move || {
-                loop {
-                    raw_client.lock().unwrap().heartbeat(&game)?;
-                    thread::sleep(Duration::from_secs(10))
-                }
-            })
+        self.heartbeat = Some(
+            Timer::new(Duration::from_secs(10))
         );
+
+        self.heartbeat.as_mut().unwrap().start(move || {
+            raw_client.lock().unwrap().heartbeat(&game).ok();
+        });
     }
 
     pub fn stop_heartbeat(&mut self) -> Result<()> {
-        self.heartbeat_handle
-            .take().expect("Trying to stop uninitialized heartbeat thread")
-            .join().expect("Could not join heartbeat thread")
+        Ok(
+            self.heartbeat.as_mut().context("Trying to stop uninitialized heartbeat thread")?.stop()?
+        )
     }
 
     pub fn register_event(&self, event: &str) -> Result<String> {
