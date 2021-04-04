@@ -4,7 +4,7 @@
 //! To use this crate, simply add it as a dependency:
 //! ```toml
 //! [dependency]
-//! gamesense = "0.1.1"
+//! gamesense = "0.1.2"
 //! ```
 //!
 //!
@@ -17,7 +17,7 @@
 //! deemed optional by the official documentation can receive `None` as a value to default it to the server's default.
 //! If you wish to have a raw client for the API, you can! Simply use the [`gamesense::raw_client::RawGameSenseClient`][raw_client::RawGameSenseClient]
 //!
-//! For more (in-depth) examples refer to the [examples](https://github.com/ptrstr/gamesense/examples)
+//! For more (in-depth) examples refer to the [examples](https://github.com/ptrstr/gamesense/tree/master/examples)
 //!
 //! For information regarding the API see the [original API documentation](https://github.com/SteelSeries/gamesense-sdk)
 
