@@ -15,7 +15,7 @@ fn main() -> Result<()> {
                 screen::ScreenFrameData::MultiLineFrameData(screen::MultiLineFrameData {
                     frame_modifiers_data: Some(screen::FrameModifiersData {
                         length_millis: Some(3000),
-                        icon_id: Some(0),
+                        icon_id: Some(screen::Icon::None),
                         repeats: None
                     }),
                     lines: vec![

@@ -1,7 +1,63 @@
 use serde::Serialize;
+use serde_repr::Serialize_repr;
 
 // Reference: https://github.com/SteelSeries/gamesense-sdk/blob/master/doc/api/json-handlers-screen.md
 
+
+#[derive(Serialize, Debug)]
+#[serde(untagged)]
+pub enum Repeat {
+    Bool(bool),
+    Integer(isize)
+}
+
+#[derive(Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+pub enum Icon {
+    DragonTimer = 34,
+
+    None = 0,
+    HealthPlus = 1,
+    Armor = 2,
+    Ammo = 3,
+    Money = 4,
+    Explosion = 5,
+    Kill = 6,
+    Headshot = 7,
+    Helmet = 8,
+    Hunger = 10,
+    Air = 11,
+    Compass = 12,
+    Pickaxe = 13,
+    Potion = 14,
+    Clock = 15,
+    Lightning = 16,
+    Item = 17,
+    AtSymbol = 18,
+    Muted = 19,
+    Talking = 20,
+    Connect = 21,
+    Disconnect = 22,
+    Music = 23,
+    Play = 24,
+    Pause = 25,
+    Cpu = 27,
+    Gpu = 28,
+    Ram = 29,
+    Assist = 30,
+    Creep = 31,
+    Dead = 32,
+    Dragon = 33,
+    Enemy = 35,
+    Game = 36,
+    Gold = 37,
+    HealthHeart = 38,
+    Skull = 39,
+    Mana = 40,
+    Teammates = 41,
+    Timer = 42,
+    Temperature = 43,
+}
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
@@ -9,16 +65,16 @@ pub struct FrameModifiersData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub length_millis: Option<isize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub icon_id: Option<u8>,
+    pub icon_id: Option<Icon>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub repeats: Option<isize>
+    pub repeats: Option<Repeat>
 }
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub struct DataAccessorData {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub arg:Option<String>,
+    pub arg: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context_frame_key: Option<String>
 }
@@ -68,7 +124,7 @@ pub struct SingleLineFrameData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frame_modifiers_data: Option<FrameModifiersData>,
     #[serde(flatten)]
-    pub line_data: LineData
+    pub line: LineData
 }
 
 #[derive(Serialize, Debug)]
@@ -83,6 +139,8 @@ pub struct MultiLineFrameData {
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub struct ImageFrameData {
+    // Undocumented but required
+    pub has_text: bool,
     #[serde(flatten)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub frame_modifiers_data: Option<FrameModifiersData>,
