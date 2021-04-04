@@ -4,7 +4,7 @@
 //! To use this crate, simply add it as a dependency:
 //! ```toml
 //! [dependency]
-//! gamesense = "0.1.0"
+//! gamesense = "0.1.1"
 //! ```
 //!
 //!
