@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use crate::raw_client::RawGameSenseClient;
 use crate::timer::Timer;
+use crate::handler;
 use serde_json;
+use serde::Serialize;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -19,6 +21,7 @@ impl GameSenseClient {
             heartbeat: None
         };
 
+        client.raw_client.lock().unwrap().remove_game(&client.game).ok();
         client.raw_client.lock().unwrap().register_game(&client.game, Some(game_display_name), Some(developer), deinitialize_timer_length_ms)?;
 
         Ok(client)
@@ -54,12 +57,21 @@ impl GameSenseClient {
         )
     }
 
+    pub fn bind_event<T: Serialize + handler::Handler>(&self, event: &str, min_value: Option<isize>, max_value: Option<isize>, icon_id: Option<u8>, value_optional: Option<bool>, handlers: Vec<T>) -> Result<String> {
+        self.raw_client.lock().unwrap().bind_event(&self.game, event, min_value, max_value, icon_id, value_optional, handlers)
+    }
+
     pub fn register_event(&self, event: &str) -> Result<String> {
-        self.raw_client.lock().unwrap().register_event(&self.game, event, None, None, None, None)
+        self.register_event_full(event, None, None, None, None)
     }
 
     pub fn register_event_full(&self, event: &str, min_value: Option<isize>, max_value: Option<isize>, icon_id: Option<u8>, value_optional: Option<bool>) -> Result<String> {
+        // self.remove_event(event).ok();
         self.raw_client.lock().unwrap().register_event(&self.game, event, min_value, max_value, icon_id, value_optional)
+    }
+
+    pub fn remove_event(&self, event: &str) -> Result<String> {
+        self.raw_client.lock().unwrap().remove_event(&self.game, event)
     }
 
     pub fn trigger_event(&self, event: &str, value: isize) -> Result<String> {
