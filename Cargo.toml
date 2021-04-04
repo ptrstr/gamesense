@@ -9,7 +9,7 @@ homepage = "https://github.com/ptrstr/gamesense/"
 readme = "README.md"
 documentation = "https://docs.rs/gamesense"
 description = "SteelSeries GameSense™ client written in Rust"
-keywords = ["gamedev", "steelseries", "gamsense"]
+keywords = ["gamedev", "steelseries", "gamesense"]
 categories = ["api-bindings", "game-engines"]
 
 
